@@ -1,67 +1,14 @@
-"""
-game_data.py — All data, constants, and board configuration.
-
-=======================================================================
-  HOW TO EDIT THE BOARD
-=======================================================================
-
-Every space is its own clearly-labelled block below in BOARD_SPACES.
-Change whatever you want inside each block. The fields are:
-
-  "label"   — The name displayed on screen and in messages.
-
-  "type"    — Controls the COLOR of the circle on the board.
-              Pick one of:
-                start | finish | normal | sip | shot |
-                back | everyone_sip | forward | event
-
-  "effect"  — What actually HAPPENS when someone lands here.
-              Built-in effects:
-                "sip"          → player drinks. Set "value" = number of sips.
-                "shot"         → player takes a shot.
-                "everyone_sip" → ALL players take 1 sip.
-                "back"         → player moves back. Set "value" = spaces.
-                "forward"      → player moves forward. Set "value" = spaces.
-                "none"         → nothing happens (boring space).
-                "finish"       → end of the game.
-
-              Custom / party effects:
-                "custom"       → shows your "msg" text on screen as a big
-                                 event banner. Players read it and do whatever
-                                 it says. No automatic drinks — you control it.
-                                 Use {name} in "msg" to insert the player's name.
-                                 Use {label} for the space name.
-
-  "value"   — Number used by sip / back / forward effects.
-  "msg"     — Text shown for "custom" effect. Use {name} and {label}.
-
-=======================================================================
-  ADDING A NEW CUSTOM SPACE
-=======================================================================
-
-  1. Find a "normal" space you want to replace.
-  2. Change its "label" to whatever you want.
-  3. Change "type" to "event" (gives it an orange color).
-  4. Change "effect" to "custom".
-  5. Write your rule in "msg". Example:
-
-        "msg": "{name} must do their best impression of a pigeon, or take 2 sips!"
-
-  That's it. Save the file and restart the game.
-
-=======================================================================
-"""
-
 import os
 import json
 import glob
+from board_view import make_world_positions
 
 # ---------------------------------------------------------------------------
-# Screen constants
+# Window & Display
 # ---------------------------------------------------------------------------
 SCREEN_W  = 1280
 SCREEN_H  = 800
-BOARD_W   = 865
+BOARD_W   = 870
 SIDEBAR_X = 870
 SIDEBAR_W = SCREEN_W - SIDEBAR_X
 FPS       = 60
@@ -83,6 +30,7 @@ BLUE            = ( 75, 145, 220)
 ORANGE          = (230, 118,  40)
 PURPLE          = (170,  90, 215)
 TEAL            = ( 70, 200, 178)
+PINK            = (255,  40, 180)
 SIDEBAR_BG      = (188, 152,  90)
 SIDEBAR_DARK    = (158, 122,  60)
 GOLD            = (255, 205,  30)
@@ -184,6 +132,102 @@ PARTY_SQUARE_COMPONENTS = {
         "type":   "event",
         "effect": "new_rule",
         "color":  (92, 188, 198),
+    },
+    "whirlpool": {
+        "label":  "Whirlpool",
+        "type":   "event",
+        "effect": "whirlpool",
+        "color":  (72, 185, 212),
+    },
+    "longest_road": {
+        "label":  "Longest Road",
+        "type":   "event",
+        "effect": "longest_road",
+        "color":  (230, 138, 72),
+    },
+    "beer_bitch": {
+        "label":  "Beer Bitch",
+        "type":   "event",
+        "effect": "beer_bitch",
+        "color":  (255, 105, 180),
+    },
+    "specialty_shot": {
+        "label":  "Specialty Shot",
+        "type":   "event",
+        "effect": "specialty_shot",
+        "color":  (230, 92, 82),
+    },
+    "east_west": {
+        "label":  "East / West",
+        "type":   "event",
+        "effect": "east_west",
+        "color":  (120, 170, 235),
+    },
+    "younger_older": {
+        "label":  "Younger / Older",
+        "type":   "event",
+        "effect": "younger_older",
+        "color":  (235, 152, 102),
+    },
+    "jfk": {
+        "label":  "JFK",
+        "type":   "event",
+        "effect": "jfk",
+        "color":  (212, 82, 82),
+    },
+    "gay_chicken": {
+        "label":  "Gay Chicken",
+        "type":   "event",
+        "effect": "gay_chicken",
+        "color":  (235, 122, 152),
+    },
+    "chug_speak": {
+        "label":  "Chug Speak",
+        "type":   "event",
+        "effect": "chug_speak",
+        "color":  (212, 82, 82),
+    },
+    "email_professor": {
+        "label":  "Email a Professor",
+        "type":   "event",
+        "effect": "email_professor",
+        "color":  (120, 170, 235),
+    },
+    "call_parent": {
+        "label":  "Call a Parent",
+        "type":   "event",
+        "effect": "call_parent",
+        "color":  (92, 188, 198),
+    },
+    "pikmin": {
+        "label":  "Pikmin",
+        "type":   "event",
+        "effect": "pikmin",
+        "color":  (92, 172, 122),
+    },
+    "swap_pants": {
+        "label":  "Swap Pants",
+        "type":   "event",
+        "effect": "swap_pants",
+        "color":  (175, 115, 225),
+    },
+    "serenade": {
+        "label":  "Serenade",
+        "type":   "event",
+        "effect": "serenade",
+        "color":  (235, 122, 152),
+    },
+    "jig_dance": {
+        "label":  "Do a Jig / Dance",
+        "type":   "event",
+        "effect": "jig_dance",
+        "color":  (245, 198, 62),
+    },
+    "lap": {
+        "label":  "Lap",
+        "type":   "event",
+        "effect": "lap",
+        "color":  (72, 208, 172),
     },
 }
 
@@ -661,29 +705,43 @@ SPACE_RADIUS = 32
 _BASE = os.path.dirname(os.path.abspath(__file__))
 TOKENS_DIR = os.path.join(_BASE, "assets", "tokens")
 
+
+def resolve_token_path(token_name: str, custom: bool = False) -> str:
+    """Resolve the token image path, preferring .ico with fallback to .png."""
+    sub = "custom" if custom else "default"
+    folder = os.path.join(TOKENS_DIR, sub)
+    ico = os.path.join(folder, f"{token_name}.ico")
+    if os.path.exists(ico):
+        return ico
+    png = os.path.join(folder, f"{token_name}.png")
+    if os.path.exists(png):
+        return png
+    return ico
+
+
 DEFAULT_TOKENS = {
-    "pizza":  os.path.join(TOKENS_DIR, "default", "pizza.png"),
-    "beer":   os.path.join(TOKENS_DIR, "default", "beer.png"),
-    "dice":   os.path.join(TOKENS_DIR, "default", "dice.png"),
-    "cup":    os.path.join(TOKENS_DIR, "default", "cup.png"),
-    "star":   os.path.join(TOKENS_DIR, "default", "star.png"),
-    "nerf":   os.path.join(TOKENS_DIR, "default", "nerf.png"),
-    "lion":   os.path.join(TOKENS_DIR, "default", "lion.png"),
-    "ducky":  os.path.join(TOKENS_DIR, "default", "ducky.png"),
-    "plane":  os.path.join(TOKENS_DIR, "default", "plane.png"),
-    "spoon":  os.path.join(TOKENS_DIR, "default", "spoon.png"),
-    "cactus": os.path.join(TOKENS_DIR, "default", "cactus.png"),
-    "crown":  os.path.join(TOKENS_DIR, "default", "crown.png"),
-    "taco":   os.path.join(TOKENS_DIR, "default", "taco.png"),
+    "pizza":  resolve_token_path("pizza"),
+    "beer":   resolve_token_path("beer"),
+    "dice":   resolve_token_path("dice"),
+    "cup":    resolve_token_path("cup"),
+    "star":   resolve_token_path("star"),
+    "nerf":   resolve_token_path("nerf"),
+    "lion":   resolve_token_path("lion"),
+    "ducky":  resolve_token_path("ducky"),
+    "plane":  resolve_token_path("plane"),
+    "spoon":  resolve_token_path("spoon"),
+    "cactus": resolve_token_path("cactus"),
+    "crown":  resolve_token_path("crown"),
+    "taco":   resolve_token_path("taco"),
 }
 
 # ---------------------------------------------------------------------------
 # Add your friends' custom tokens here.
 # Drop the image file in assets/tokens/custom/ then add a line like:
-#   "alex": os.path.join(TOKENS_DIR, "custom", "alex.png"),
+#   "alex": resolve_token_path("alex", custom=True),
 # ---------------------------------------------------------------------------
 CUSTOM_TOKENS = {
-    # "alex": os.path.join(TOKENS_DIR, "custom", "alex.png"),
+    # "alex": resolve_token_path("alex", custom=True),
 }
 
 ALL_TOKENS  = {**DEFAULT_TOKENS, **CUSTOM_TOKENS}
@@ -696,22 +754,132 @@ MIN_PLAYERS = 2
 MAX_PLAYERS = 15
 
 # ---------------------------------------------------------------------------
-# Flavor titles shown on leaderboard
+# Mario Party-style End-of-Game Superlative Titles & Awards
+# (Calculated from match accomplishments/endurance, not score thresholds)
 # ---------------------------------------------------------------------------
-FLAVOR_TITLES = [
-    (400, "The Shot Caller"),
-    (280, "Grease Wizard"),
-    (160, "Sip Goblin"),
-    (80,  "Crust Climber"),
-    (20,  "Pizza Wanderer"),
-    (0,   "Dough Novice"),
-]
 
-def get_flavor_title(score: int) -> str:
-    for threshold, title in FLAVOR_TITLES:
-        if score >= threshold:
-            return title
-    return "Dough Novice"
+def calculate_player_titles(players: list, winner=None) -> dict:
+    """Assign fun Mario Party-style superlative titles based on game stats.
+
+    Titles are based on accomplishments and endurance during the match:
+      - Champion (winner / reached finish)
+      - Beer Bitch (designated beer bitch)
+      - Marathoner (most distance traveled)
+      - Sip Goblin (most sips taken)
+      - Shot Caller (most shots taken)
+      - Moonwalker (most backward steps / setbacks)
+      - Party Animal (most events landed on)
+      - Iron Liver (0 drinks / fewest total drinks)
+      - Benchwarmer (most skipped turns)
+      - Pub Regular / Good Sport / Pizza Fiend (default party titles)
+    """
+    if not players:
+        return {}
+
+    titles = {}
+    assigned_players = set()
+
+    # 1. Winner / Champion
+    if winner is not None and winner in players:
+        titles[winner] = "Champion"
+        assigned_players.add(winner)
+    else:
+        for p in players:
+            if getattr(p, "finished", False):
+                titles[p] = "Champion"
+                assigned_players.add(p)
+                break
+
+    # 2. Beer Bitch (priority if active)
+    for p in players:
+        if p not in assigned_players and getattr(p, "is_beer_bitch", False):
+            titles[p] = "Beer Bitch"
+            assigned_players.add(p)
+            break
+
+    # 3. Whirlpool Victim (still trapped in whirlpool when game ends)
+    for p in players:
+        if p not in assigned_players and getattr(p, "whirlpool_position", None) is not None:
+            titles[p] = "Still Spinning"
+            assigned_players.add(p)
+
+    # Helper to find strictly unique best among unassigned players
+    def find_best(key_fn, min_val=1):
+        candidates = [p for p in players if p not in assigned_players and key_fn(p) >= min_val]
+        if not candidates:
+            return None
+        best_val = max(key_fn(p) for p in candidates)
+        best_players = [p for p in candidates if key_fn(p) == best_val]
+        if len(best_players) == 1:
+            return best_players[0]
+        return None
+
+    # 3. Most Distance Traveled (Marathoner)
+    dist_champ = find_best(lambda p: getattr(p, "distance_traveled", 0), min_val=2)
+    if dist_champ:
+        titles[dist_champ] = "Marathoner"
+        assigned_players.add(dist_champ)
+
+    # 4. Most Sips (Sip Goblin)
+    sip_champ = find_best(lambda p: getattr(p, "sips", 0), min_val=2)
+    if sip_champ:
+        titles[sip_champ] = "Sip Goblin"
+        assigned_players.add(sip_champ)
+
+    # 5. Most Shots (Shot Caller)
+    shot_champ = find_best(lambda p: getattr(p, "shots", 0), min_val=1)
+    if shot_champ:
+        titles[shot_champ] = "Shot Caller"
+        assigned_players.add(shot_champ)
+
+    # 6. Moonwalker (most backward steps)
+    back_champ = find_best(lambda p: getattr(p, "backward_steps", 0), min_val=1)
+    if back_champ:
+        titles[back_champ] = "Moonwalker"
+        assigned_players.add(back_champ)
+
+    # 7. Party Animal (most events landed on)
+    event_champ = find_best(lambda p: getattr(p, "events_landed", 0), min_val=1)
+    if event_champ:
+        titles[event_champ] = "Party Animal"
+        assigned_players.add(event_champ)
+
+    # 8. Iron Liver (0 drinks among drinkers)
+    zero_drinkers = [p for p in players if p not in assigned_players and (getattr(p, "sips", 0) + getattr(p, "shots", 0)) == 0]
+    if len(zero_drinkers) == 1:
+        titles[zero_drinkers[0]] = "Iron Liver"
+        assigned_players.add(zero_drinkers[0])
+
+    # 9. Benchwarmer (most skipped turns)
+    skip_champ = find_best(lambda p: getattr(p, "total_skips", 0) or getattr(p, "skip_turns", 0), min_val=1)
+    if skip_champ:
+        titles[skip_champ] = "Benchwarmer"
+        assigned_players.add(skip_champ)
+
+    # 10. Fallback titles for remaining players
+    default_pool = ["Pub Regular", "Party Veteran", "Pizza Fiend", "Speedster", "Good Sport", "Dice Roller"]
+    pool_idx = 0
+    for p in players:
+        if p not in titles:
+            titles[p] = default_pool[pool_idx % len(default_pool)]
+            pool_idx += 1
+
+    return titles
+
+
+def get_player_title(player, all_players: list | None = None, winner=None) -> str:
+    """Return the Mario Party-style superlative title for a player."""
+    if not all_players:
+        if winner is player or getattr(player, "finished", False):
+            return "Champion"
+        if getattr(player, "is_beer_bitch", False):
+            return "Beer Bitch"
+        if getattr(player, "whirlpool_position", None) is not None:
+            return "Still Spinning"
+        return "Pub Regular"
+    titles = calculate_player_titles(all_players, winner=winner)
+    return titles.get(player, "Pub Regular")
+
 
 # ---------------------------------------------------------------------------
 # Menu flavor text — shows randomly on the main menu
@@ -746,37 +914,75 @@ SHARED_OFFSETS = {
 BOARDS_DIR = os.path.join(_BASE, "game_boards")
 
 
+class BoardValidationError(ValueError):
+    """Raised when a board JSON schema or layout is invalid."""
+
+
+def validate_board_data(data: dict, source: str = "") -> list[dict]:
+    if not isinstance(data, dict) or "spaces" not in data:
+        raise BoardValidationError("Board must be a dict containing 'spaces'")
+    spaces = data["spaces"]
+    if not isinstance(spaces, list) or len(spaces) < 2:
+        raise BoardValidationError("Board must have at least 2 spaces")
+    if spaces[0].get("type") != "start" or spaces[-1].get("type") != "finish":
+        raise BoardValidationError("Board must have distinct start and finish spaces")
+    for i, sp in enumerate(spaces):
+        if sp.get("id") != i:
+            raise BoardValidationError(f"Non-contiguous or invalid space id: {sp.get('id')} != {i}")
+        comp = sp.get("component")
+        if comp and comp not in PARTY_SQUARE_COMPONENTS:
+            raise BoardValidationError(f"Unknown component: {comp}")
+        effect = sp.get("effect")
+        value = sp.get("value")
+        if effect in ("skip", "forward", "back", "sip"):
+            if value is not None and value <= 0:
+                raise BoardValidationError(f"Invalid value {value} for effect {effect}")
+        if effect == "ladder":
+            target = sp.get("target")
+            if target is None or target < 0 or target >= len(spaces) or target == i:
+                raise BoardValidationError(f"Invalid ladder target {target}")
+    return spaces
+
+
 def list_boards() -> list:
-    """Return list of dicts: {path, name, description} for every board JSON found."""
+    """Return list of dicts: {path, name, description} for every valid board JSON found."""
+    boards, _ = scan_boards()
+    return boards
+
+
+def scan_boards() -> tuple[list[dict], list[str]]:
+    """Scan game_boards directory and return (valid_boards, warning_messages)."""
     paths = sorted(glob.glob(os.path.join(BOARDS_DIR, "*.json")))
-    result = []
+    boards = []
+    warnings = []
     for path in paths:
         try:
             with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            result.append({
+                content = f.read().strip()
+                if not content:
+                    warnings.append(f"Empty board file: {os.path.basename(path)}")
+                    continue
+                data = json.loads(content)
+            validate_board_data(data, path)
+            boards.append({
                 "path":        path,
                 "name":        data.get("name", os.path.basename(path)),
                 "description": data.get("description", ""),
             })
-        except Exception:
-            pass
-    return result
+        except Exception as e:
+            warnings.append(f"Invalid board file {os.path.basename(path)}: {e}")
+    return boards, warnings
 
 
 def load_board(path: str):
-    """Load a board JSON and return (spaces_list, finish_index).
-
-    Injects the on-screen 'pos' from _POS[id] for each space so the
-    rest of the game code works exactly as before.
-    Supports reusable components via:
-      {"id": 2, "component": "karaoke"}
-    """
+    """Load a board JSON and return (spaces_list, finish_index, board_name)."""
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
+    spaces_data = validate_board_data(data, path)
+    positions = make_world_positions(len(spaces_data))
     spaces = []
-    for sp in data["spaces"]:
-        sp = dict(sp)           # copy so we don't mutate the parsed dict
+    for i, sp in enumerate(spaces_data):
+        sp = dict(sp)
         comp_name = sp.get("component")
         if comp_name:
             base = PARTY_SQUARE_COMPONENTS.get(comp_name)
@@ -786,10 +992,10 @@ def load_board(path: str):
                     if k != "component":
                         merged[k] = v
                 sp = merged
-        sp["pos"] = _POS[sp["id"]]
+        sp["pos"] = positions[i]
         spaces.append(sp)
     finish_index = len(spaces) - 1
-    board_name   = data.get("name", os.path.basename(path))
+    board_name = data.get("name", os.path.basename(path))
     return spaces, finish_index, board_name
 
 

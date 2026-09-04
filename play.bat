@@ -1,5 +1,9 @@
 @echo off
 cd /d "%~dp0"
-call .venv\Scripts\activate.bat
-python main.py
+if not exist ".venv\Scripts\python.exe" (
+  echo Python environment not found. Follow the setup steps in README.md.
+  pause
+  exit /b 1
+)
+".venv\Scripts\python.exe" main.py
 pause

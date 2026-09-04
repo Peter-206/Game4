@@ -1,0 +1,281 @@
+{
+  "name": "Original Gangster's Paradise",
+  "description": "OG josh and alex",
+  "spaces": [
+    {
+      "id": 0,
+      "label": "Start",
+      "type": "start",
+      "effect": "none"
+    },
+    {
+      "id": 1,
+      "label": "Shot",
+      "type": "shot",
+      "effect": "shot"
+    },
+    {
+      "id": 2,
+      "label": "Sip",
+      "type": "sip",
+      "effect": "sip",
+      "value": 1
+    },
+    {
+      "id": 3,
+      "label": "Mate",
+      "component": "mate"
+    },
+    {
+      "id": 4,
+      "label": "Chicks / Dicks",
+      "component": "chicks_dicks"
+    },
+    {
+      "id": 5,
+      "label": "Whirlpool",
+      "component": "whirlpool"
+    },
+    {
+      "id": 6,
+      "label": "JFK",
+      "component": "jfk"
+    },
+    {
+      "id": 7,
+      "label": "Rattlin Bog",
+      "component": "rattlin_bog"
+    },
+    {
+      "id": 8,
+      "label": "Move Back",
+      "type": "back",
+      "effect": "back",
+      "value": 3
+    },
+    {
+      "id": 9,
+      "label": "Gay Chicken",
+      "component": "gay_chicken"
+    },
+    {
+      "id": 10,
+      "label": "New Rule",
+      "component": "new_rule"
+    },
+    {
+      "id": 11,
+      "label": "East / West",
+      "component": "east_west"
+    },
+    {
+      "id": 12,
+      "label": "Drunk Driving",
+      "component": "drunk_driving"
+    },
+    {
+      "id": 13,
+      "label": "Shot",
+      "type": "shot",
+      "effect": "shot"
+    },
+    {
+      "id": 14,
+      "label": "Chug Speak",
+      "component": "chug_speak"
+    },
+    {
+      "id": 15,
+      "label": "Swap Pants",
+      "component": "swap_pants"
+    },
+    {
+      "id": 16,
+      "label": "Move Forward",
+      "type": "forward",
+      "effect": "forward",
+      "value": 3
+    },
+    {
+      "id": 17,
+      "label": "Mate",
+      "component": "mate"
+    },
+    {
+      "id": 18,
+      "label": "Serenade",
+      "component": "serenade"
+    },
+    {
+      "id": 19,
+      "label": "Shot",
+      "type": "shot",
+      "effect": "shot"
+    },
+    {
+      "id": 20,
+      "label": "Drunk Driving",
+      "component": "drunk_driving"
+    },
+    {
+      "id": 21,
+      "label": "Lap",
+      "component": "lap"
+    },
+    {
+      "id": 22,
+      "label": "Beer Bitch",
+      "component": "beer_bitch"
+    },
+    {
+      "id": 23,
+      "label": "Double Shot / Single Shot",
+      "component": "double_or_single_shot"
+    },
+    {
+      "id": 24,
+      "label": "New Rule",
+      "component": "new_rule"
+    },
+    {
+      "id": 25,
+      "label": "Specialty Shot",
+      "component": "specialty_shot"
+    },
+    {
+      "id": 26,
+      "label": "Everyone Drinks",
+      "type": "everyone_sip",
+      "effect": "everyone_sip"
+    },
+    {
+      "id": 27,
+      "label": "Longest Road",
+      "component": "longest_road"
+    },
+    {
+      "id": 28,
+      "label": "Call a Parent",
+      "component": "call_parent"
+    },
+    {
+      "id": 29,
+      "label": "Longest Road",
+      "component": "longest_road"
+    },
+    {
+      "id": 30,
+      "label": "Move Back",
+      "type": "back",
+      "effect": "back",
+      "value": 11
+    },
+    {
+      "id": 31,
+      "label": "Beer Bitch",
+      "component": "beer_bitch"
+    },
+    {
+      "id": 32,
+      "label": "Androids / iPhones",
+      "component": "androids_iphones"
+    },
+    {
+      "id": 33,
+      "label": "New Rule",
+      "component": "new_rule"
+    },
+    {
+      "id": 34,
+      "label": "Move Back",
+      "type": "back",
+      "effect": "back",
+      "value": 3
+    },
+    {
+      "id": 35,
+      "label": "Shotgun",
+      "component": "shotgun"
+    },
+    {
+      "id": 36,
+      "label": "Mate",
+      "component": "mate"
+    },
+    {
+      "id": 37,
+      "label": "Hot Seat",
+      "component": "hot_seat"
+    },
+    {
+      "id": 38,
+      "label": "Email a Professor",
+      "component": "email_professor"
+    },
+    {
+      "id": 39,
+      "label": "Whirlpool",
+      "component": "whirlpool"
+    },
+    {
+      "id": 40,
+      "label": "Move Forward",
+      "type": "forward",
+      "effect": "forward",
+      "value": 2
+    },
+    {
+      "id": 41,
+      "label": "Thunderstruck",
+      "component": "thunderstruck"
+    },
+    {
+      "id": 42,
+      "label": "Move Back",
+      "type": "back",
+      "effect": "back",
+      "value": 10
+    },
+    {
+      "id": 43,
+      "label": "Karaoke",
+      "component": "karaoke"
+    },
+    {
+      "id": 44,
+      "label": "Gay Chicken",
+      "component": "gay_chicken"
+    },
+    {
+      "id": 45,
+      "label": "Everyone Drinks",
+      "type": "everyone_sip",
+      "effect": "everyone_sip"
+    },
+    {
+      "id": 46,
+      "label": "Double Shot / Single Shot",
+      "component": "double_or_single_shot"
+    },
+    {
+      "id": 47,
+      "label": "Yikes",
+      "type": "back",
+      "effect": "back",
+      "value": 2
+    },
+    {
+      "id": 48,
+      "label": "Nope",
+      "type": "back",
+      "effect": "back",
+      "value": 5
+    },
+    {
+      "id": 49,
+      "label": "Finish",
+      "type": "finish",
+      "effect": "finish"
+    }
+  ]
+}

@@ -1,562 +1,373 @@
-# Pygame Party Board Game Prompt
+# Pizza Box Party — Pygame Host with LAN Phone Controllers
 
 ## Project Goal
 
-Build a **single-device local party board game in Python using Pygame**.
+Build a local-network party board game in Python with:
 
-The game should feel like a mix of:
-- **Candy Land** movement and board progression
-- **Snakes and Ladders / Chutes and Ladders** style jumps and setbacks
-- a **drinking game scoreboard** based on shots and sips
-- a **homemade pizza-box cardboard board game aesthetic**
+- a **Pygame host application** as the shared board and authoritative game server
+- a small **local web server** running on the host computer
+- private **browser controllers** that players open on their phones by scanning a QR code
 
-This is **not** a networked or multi-device game. Everything happens on **one screen on one computer**. The only real player input during gameplay should be:
-- entering player names before the game starts
-- picking a player icon/token before the game starts
-- clicking a **Roll Die** button during the game
+The experience should feel like Candy Land movement mixed with Chutes and Ladders, neutral drink tracking, and a homemade pizza-box board. It should have the easy join-and-play rhythm of a Jackbox game without requiring cloud hosting, GitHub Pages, an App Store application, or port forwarding.
 
-There should be **very little gameplay interaction beyond rolling**. The game flow should be simple, readable, and party-friendly.
+All devices must be connected to the same private Wi-Fi or LAN. GitHub may store the source code but is not involved while a game is running.
 
----
+## Product Principles
 
-## Core Design Requirements
+- The Pygame host owns all authoritative state, including the room, players, turns, die results, movement, events, drink totals, and winner.
+- Phones are private controllers, not independent game clients.
+- Setup happens primarily on phones. The shared screen displays the lobby and joined players.
+- During normal turns, only the current player's controller exposes the **Roll Die** button.
+- Event choices and typed answers happen privately on the relevant phone and are revealed on the shared display only after submission.
+- Keep interaction minimal: join, configure a player, roll, and respond only when an event requires it.
+- The board remains hard-coded and easy to edit through data files.
+- Preserve the cardboard pizza-box aesthetic and compact player-status panel.
+- Shots and sips are neutral history counters. They never determine rank, turn order, labels, or the winner.
+- Present the board as a wide, left-to-right scrolling world instead of showing the entire path at once.
+- Show only the active player's token in the scrolling world; keep every player represented in the fixed sidebar.
 
-### High-level concept
+## Required Architecture
 
-Make a local Pygame board game where players:
-1. start at a main menu
-2. choose or confirm the number of players
-3. enter names
-4. pick token icons/images
-5. start the game
-6. take turns rolling a die
-7. move across a hard-coded board
-8. trigger space effects like sips, shots, ladders, setbacks, and special events
-9. accumulate score automatically
-10. finish at an end screen with rankings
+### Host application
 
-### Important design constraints
+The host computer runs one application containing:
 
-- The board should be **hard coded**, not procedurally generated.
-- The board data should be **very easy to edit manually in code**.
-- Token pieces should be **image-based**, not just colored circles.
-- There should be **built-in default token choices**, but the code should also make it easy to add custom images manually.
-- The interface should be **clean and readable**, not overloaded with controls.
-- The leaderboard should be **compact and stylized**, with personality, but should not take over the screen.
-- The board should visually feel like it was drawn on a **pizza box / cardboard game board**.
+- the Pygame shared display
+- the game-state and rules engine
+- an HTTP server that serves the phone controller
+- a WebSocket server for real-time messages
+- QR-code generation for the active room URL
 
----
-
-## Technical Requirements
-
-### Language and framework
-- Python 3
-- Pygame
-
-### Recommended architecture
-Structure the project cleanly. Keep the data easy to edit.
-
-Suggested file structure:
+The server must listen on the host's LAN address rather than only `localhost`. On startup, detect a usable local IPv4 address and display both the join URL and its QR code. A typical URL is:
 
 ```text
-project/
-├─ main.py
-├─ game_data.py
-├─ models.py
-├─ ui.py
-├─ assets/
-│  ├─ board/
-│  ├─ tokens/
-│  │  ├─ default/
-│  │  └─ custom/
-│  ├─ fonts/
-│  └─ icons/
+http://192.168.1.42:8080/join?room=ABCD&token=<temporary-room-token>
 ```
 
-A simplified version is also acceptable if the code stays readable.
+The room token must be unpredictable and valid only for the current hosted session. Do not rely on the room code alone as authorization.
 
----
+### Phone controller
 
-## Required Game States / Screens
+The controller is a responsive HTML/CSS/JavaScript page served directly by the host. It must work in current iPhone Safari and common Android browsers without installation.
 
-Implement the game using clear screen states.
+Controller states:
+
+1. Connecting
+2. Player setup
+3. Lobby waiting
+4. Waiting for another player
+5. Active turn with Roll Die
+6. Private event prompt or choice
+7. Submitted/waiting
+8. Host paused
+9. Reconnecting
+10. Game ended
+
+The controller should display only information useful to that player. The scrolling board view and player-status panel remain on Pygame.
+
+### State authority and synchronization
+
+- Clients submit intentions such as `join`, `roll`, or `event_response`.
+- The host validates every action, mutates state, and broadcasts the resulting state.
+- The phone must never choose its own die result, calculate movement, change drink totals, or decide whether an action is legal.
+- Reject out-of-turn rolls, duplicate responses, stale actions, invalid room tokens, and gameplay actions while paused.
+- Give each joined player a private session token stored in the browser so a refresh or brief Wi-Fi interruption can reclaim the same player slot.
+- Do not create a duplicate player during reconnection.
+
+## Network Interface
+
+The exact Python framework may be chosen during implementation, but the behavior below is required.
+
+### HTTP responsibilities
+
+- serve the controller page and its static assets
+- expose a lightweight health/room-status endpoint
+- serve the active room join route embedded in the QR code
+
+### WebSocket message categories
+
+Client to host:
+
+- `join`: room token, display name, and selected token
+- `reconnect`: room token and saved player session token
+- `roll`: player session identity and current turn identifier
+- `event_response`: prompt identifier and submitted text, option, player selection, or confirmation
+- `leave`: voluntary departure from the lobby
+
+Host to clients:
+
+- `room_state`: lobby status and available tokens
+- `player_joined` / `player_left`
+- `game_started`
+- `turn_state`: current player and turn identifier
+- `roll_result`
+- `event_prompt`: private prompt sent only to intended recipients
+- `event_resolved`: public-safe result
+- `drink_state`: neutral shot and sip totals in stable player order
+- `paused` / `resumed`
+- `game_ended`
+- `error`
+
+Every state-changing client message must identify the room, player session, and relevant turn or prompt. The server must make repeated submissions idempotent or reject them safely.
+
+## Required Screens
 
 ### 1. Main Menu
-This should be the first screen.
 
-Requirements:
 - title/logo area
-- buttons for:
-  - Play
-  - Quit
-- optional subtitle or flavor text
-- visual theme already reflects the cardboard / pizza box aesthetic
+- Host Game button
+- Quit button
+- cardboard/pizza-box visual theme
 
-### 2. Player Setup Screen
-This is where players configure the game.
+### 2. Host Lobby
 
-Requirements:
-- allow choosing number of players using a simple method
-  - support at least 2–8 players
-- for each active player slot:
-  - editable name input field
-  - token/icon picker
-  - visible token preview
-- if a name is left blank, assign default names like:
-  - Player 1
-  - Player 2
-  - etc.
-- Start Game button
-- Back button to return to menu
+- dynamically generated QR code and readable LAN URL
+- temporary room code for recognition and troubleshooting
+- list of connected players with names, connection status, and token previews
+- configured minimum and maximum player counts
+- Start Game and Back buttons
+- Start Game disabled until at least two players have joined
+- host ability to remove a player before starting
 
-Gameplay should require **minimal input later**, so this setup screen is where most customization happens.
+Players configure themselves on their phones. The Pygame host should not require typing every player's name.
 
 ### 3. Main Game Screen
-This is the primary play screen.
 
-Requirements:
-- large visible board
-- player tokens placed on current board spaces
-- clear indication of whose turn it is
-- Roll Die button
-- display for latest die roll
-- short event/message banner describing what happened
-- compact leaderboard
-- optional subtle decorative elements
+- horizontally scrolling board viewport showing only part of a wide virtual world
+- active player's token centered when possible; other tokens remain hidden from the world view
+- automatic camera movement with no manual scrolling controls
+- clear current-player indicator
+- latest die result and movement animation
+- event/message banner
+- fixed compact sidebar listing every player in stable turn order
+- connection indicator for each player
+- no ordinary host Roll Die button; rolling belongs to the current player's phone
+- discreet host controls available through the pause menu
 
 ### 4. End Screen
-Shown when someone wins.
+
+- winner banner
+- neutral player recap in join order
+- sip and shot totals for each player
+- Play Again and Main Menu buttons
+- Play Again returns connected controllers to a fresh lobby or setup-ready state
+
+## Host Safety Controls
+
+Press Escape during gameplay to open a host-only pause menu with:
+
+- Resume
+- Rules
+- Skip Disconnected Player
+- Remove Player
+- Correct Drink Totals
+- End Game Early
+- Main Menu
+
+Normal gameplay pauses if the current player disconnects. Allow that player to reconnect using the saved session token. The host may then skip the turn or remove the player. Removing a player must safely repair turn order and persistent relationships such as Mate pairings.
+
+Ending early must produce a clearly labeled early-results screen and must not falsely declare the first player as the winner.
+
+## Player Setup on Phones
+
+Each player:
+
+1. scans the host QR code
+2. enters a display name
+3. selects an available image token
+4. submits and waits in the lobby
 
 Requirements:
-- winner banner
-- final rankings
-- show score plus sip/shot totals
-- buttons for:
-  - Play Again
-  - Main Menu
 
----
+- blank names become `Player 1`, `Player 2`, and so on
+- names have a documented length limit and are escaped before display
+- token choices show image previews
+- claimed tokens become unavailable to other players
+- the host may allow duplicates only when there are more players than available tokens
+- the lobby supports at least 2–8 players; a higher tested limit may be configured if every screen remains usable
 
-## Gameplay Rules
+Built-in token images live in `assets/tokens/default/`. Custom images can be added to `assets/tokens/custom/` and registered in the content configuration.
 
-### Turn flow
-Each turn should be as simple as possible:
-1. show current player
-2. player clicks Roll Die
-3. die result is generated randomly from 1 to 6
-4. current player moves forward
-5. landing space effect resolves automatically
-6. score and stats update automatically
-7. turn passes to next player
+## Turn Flow
 
-### Minimal input requirement
-Once the game starts, the only user input during turns should effectively be:
-- click/tap Roll Die
-- optional click on simple buttons like Continue if needed, but avoid unnecessary interaction
+1. The host identifies the current player and generates a unique turn identifier.
+2. Pygame pans horizontally to that player's world position.
+3. After the camera settles, that player's phone enables Roll Die; all other phones show a waiting state.
+4. The player taps Roll Die once.
+5. The host validates the request and generates a random result from 1 to 6.
+6. Pygame animates the die, active token, and following camera movement.
+7. The camera settles on the landing space and the host resolves its effect.
+8. If interaction is required, the host sends a private prompt to the appropriate phone or phones and waits for valid responses.
+9. Pygame reveals the resolved outcome and updates drink totals.
+10. The host advances to the next connected player and begins the next camera pan.
 
-Do **not** design the game around complicated player choices during turns.
+Repeated taps or duplicate WebSocket messages must never produce multiple rolls. A roll that reaches or passes the final tile clamps to the finish.
 
----
+## Board Data
 
-## Board Requirements
+Boards are ordered paths of two or more spaces and should remain manually editable in `game_boards/*.json`. Each game generates a fresh horizontal layout with constant X spacing and gently randomized Y positions based on the board's space count.
 
-### Hard-coded editable board
-The board should be defined as a **manually editable list of spaces** in one obvious place, such as `game_data.py`.
-
-Each space should be easy to edit by changing:
-- label/name
-- type
-- position on screen
-- effect values
-- target spaces for ladders or setbacks
-
-Recommended structure:
-
-```python
-BOARD_SPACES = [
-    {"id": 0, "label": "Pizza Box Start", "type": "start", "pos": (100, 600)},
-    {"id": 1, "label": "Crust Corner", "type": "sip", "value": 1, "pos": (180, 580)},
-    {"id": 2, "label": "Grease Pit", "type": "back", "value": 2, "pos": (260, 550)},
-    {"id": 3, "label": "Cheese Lift", "type": "ladder", "target": 8, "pos": (330, 510)},
-]
-```
-
-### Board movement model
-The board should function like a path of ordered spaces.
-
-Movement logic:
-- players move forward by the die result
-- landing on special spaces triggers effects
-- board spaces are indexed in order
-- last space is the finish/win condition
-
-### Recommended space types
-Support at least these:
-- `start`
-- `normal`
-- `sip`
-- `shot`
-- `ladder`
-- `back`
-- `skip`
-- `finish`
-
-Optional fun space types:
-- `forward`
-- `everyone_sip`
-- `double_roll`
-- `swap`
-- `event`
-
----
-
-## Scoring System
-
-Track actual drinking stats and derive score from them.
-
-### Scoring rules
-- each **shot** = 100 points
-- each **sip** = 20 points
-
-Each player should store:
-- shots count
-- sips count
-- score property calculated from those values
-
-Recommended structure:
-
-```python
-class Player:
-    def __init__(self, name, token_name, token_image):
-        self.name = name
-        self.token_name = token_name
-        self.token_image = token_image
-        self.position = 0
-        self.skip_turns = 0
-        self.shots = 0
-        self.sips = 0
-
-    @property
-    def score(self):
-        return self.shots * 100 + self.sips * 20
-```
-
-### Important note
-Do not just add arbitrary points directly when possible. Prefer updating `shots` and `sips`, then calculate score from those.
-
----
-
-## Leaderboard Requirements
-
-The leaderboard should be:
-- visible during gameplay
-- compact
-- stylish and funny
-- not too large
-- easy to read at a glance
-
-### Recommended leaderboard contents per row
-- token image thumbnail
-- player name
-- score
-- tiny stat line showing shots and sips
-- optional funny title
-
-Example compact row concept:
-- token | Alex | 240
-- small text underneath: `2 shots • 2 sips`
-- optional title: `Shot Caller`
-
-### Leaderboard behavior
-- sort players by score descending
-- update every turn
-- place it in a sidebar or narrow area
-- do not let it consume too much screen space
-
-### Characterized title system
-Give each player a short flavor title based on their stats or game position.
-
-Examples:
-- Shot Caller
-- Sip Goblin
-- Crust Climber
-- Pizza Wanderer
-- Grease Wizard
-- Ladder Rat
-
-This should add personality without needing much extra UI space.
-
----
-
-## Token / Piece Requirements
-
-### Image-based pieces
-Tokens should be images, not plain shapes.
-
-### Built-in token selection
-Provide around 5 default token choices stored in assets.
-Examples could be:
-- pizza slice
-- soda cup
-- beer mug
-- dice
-- little mascot
-
-### Easy custom image support
-The code should also make it easy to add custom token images manually.
-
-Recommended design:
-- `assets/tokens/default/` for built-in choices
-- `assets/tokens/custom/` for manually added friend images
-- token choices defined in a clearly editable dictionary in `game_data.py`
+The virtual board must be wider than the viewport and progress consistently from left to right. The path may move modestly up and down for visual variety but must not reverse its overall horizontal progression. World coordinates remain separate from screen coordinates; the camera transform determines where visible spaces are drawn.
 
 Example:
 
-```python
-DEFAULT_TOKENS = {
-    "pizza": "assets/tokens/default/pizza.png",
-    "beer": "assets/tokens/default/beer.png",
-    "dice": "assets/tokens/default/dice.png",
-    "cup": "assets/tokens/default/cup.png",
-    "slice": "assets/tokens/default/slice.png",
-}
-
-CUSTOM_TOKENS = {
-    "alex": "assets/tokens/custom/alex.png",
-    "sam": "assets/tokens/custom/sam.png",
+```json
+{
+  "id": 7,
+  "label": "Nacho Notch",
+  "type": "sip",
+  "effect": "sip",
+  "value": 2
 }
 ```
 
-### Token picker behavior
-On the setup screen, each player should be able to:
-- cycle left/right through available token options
-- see the selected token preview
-- avoid duplicate tokens if possible, unless duplicates are explicitly allowed
+Boards may reference reusable event components:
 
-### Token rendering on the board
-When multiple players occupy the same space:
-- offset token draw positions slightly so they do not overlap perfectly
-- keep token size reasonable and readable
-
----
-
-## Board Visual Style Requirements
-
-### Overall visual theme
-The board should feel like a homemade board game drawn on a pizza box.
-
-The look should be inspired by:
-- cardboard texture
-- pizza box brown/tan color palette
-- marker-drawn outlines
-- uneven hand-made shapes
-- casual doodles
-- slightly crooked labels
-- taped-on or scribbled decoration
-
-### Style goals
-The board should look:
-- playful
-- homemade
-- party-friendly
-- intentional, not sloppy
-
-### Important visual constraint
-Avoid making it look like a polished fantasy board or a sleek digital UI. It should specifically evoke **cardboard land / pizza box game night energy**.
-
-### Suggested visual elements
-- cardboard background texture
-- thick black marker path outlines
-- colored spaces that look hand-filled
-- rough arrows for ladders / jumps
-- hand-drawn stars, grease marks, pizza doodles, cups, arrows, cheese drips
-- title text like it was written with marker
-
-### Suggested board location names
-Use silly themed names such as:
-- Pizza Box Start
-- Crust Corner
-- Grease Pit
-- Sauce Slide
-- Cheese Lift
-- Keg Keep
-- Flat Soda Swamp
-- Topping Trail
-- Last Slice Summit
-
-These should be editable directly in the board data.
-
----
-
-## UI / UX Requirements
-
-### Input philosophy
-This should be a **low-friction couch / party game**. Keep controls simple.
-
-### During active gameplay, avoid:
-- deep menus
-- multiple actions per turn
-- too many popups
-- complicated choices
-- requiring keyboard input after the setup screen
-
-### During gameplay, prefer:
-- one obvious Roll Die button
-- readable turn banner
-- quick auto-resolution of space effects
-- short event text
-- compact leaderboard
-
-### Setup usability
-The player setup screen should be very obvious and fast to use.
-
-Each player row should ideally contain:
-- player label
-- name input box
-- token preview
-- left/right arrows or simple selector for token choice
-
----
-
-## Logic Requirements
-
-### Skip turns
-Support a `skip_turns` counter for players.
-If a player has `skip_turns > 0`:
-- decrement it on their turn
-- show a message indicating they lost a turn
-- pass to next player automatically
-
-### Win condition
-A player wins when they reach the final board space.
-You may allow exact landing or allow any roll that passes the end to clamp to the final tile.
-Keep the logic simple and party-friendly.
-
-### Space resolution examples
-Suggested behaviors:
-- `sip`: add sip count
-- `shot`: add shot count
-- `ladder`: move player to target
-- `back`: move player backward by value
-- `skip`: increase `skip_turns`
-- `normal`: no special effect
-
-### Message system
-Maintain a short text message describing the last event.
-Examples:
-- `Alex rolled a 4 and landed on Grease Pit.`
-- `Sam takes 2 sips.`
-- `Chris climbed Cheese Lift to space 12!`
-
-This message should be visible in the game UI without taking too much space.
-
----
-
-## Recommended Implementation Details
-
-### State management
-Use clear game states, for example:
-
-```python
-MENU = "menu"
-SETUP = "setup"
-GAME = "game"
-END = "end"
+```json
+{"id": 12, "component": "karaoke"}
 ```
 
-### Main loop idea
-Use one main loop and branch behavior by state.
-Each state should have separate functions/methods for:
-- handling events
-- updating
-- drawing
+Supported automatic effects should include:
 
-### Data separation
-Keep **content/config data** separate from gameplay logic.
+- `start`
+- `normal` / `none`
+- `sip`
+- `shot`
+- `everyone_sip`
+- `forward`
+- `back`
+- `skip`
+- `ladder`
+- `finish`
 
-Content/data examples:
-- board space definitions
-- token file paths
-- default player limits
-- screen constants
-- colors
+Interactive party events may request a confirmation, text response, option choice, or player selection. Their phone and shared-screen behavior is defined in `party_board_events.md`.
 
-Logic examples:
-- turn advancement
-- rolling die
-- resolving spaces
-- drawing screens
+All non-self player pickers include `Random`. The host—not the controller—resolves that option from the eligible players, always excludes the landing player, and skips the event cleanly if no target remains. Song events are also host-authoritative: Thunderstruck plays the bundled 293-second recording with 35 synchronized word cues, and Rattlin' Bog plays the bundled 328-second Carlyle Fraser recording with 14 synchronized cumulative-verse drink cues. Rendering stalls queue overdue cues so each animation is still shown once in order.
 
-This separation is important because the board must be easy to modify later.
+Validate every board before offering it in the lobby. A valid board must contain an ordered, contiguous set of supported space IDs, exactly one start, exactly one finish, valid component names, valid effect data, and valid jump targets. Invalid or empty JSON files should produce a visible host warning rather than silently disappearing.
 
----
+## Player Model and Scoring
 
-## Optional Polish Features
+Each player stores:
 
-These are nice extras if implementation stays manageable:
-- die roll animation
-- subtle token movement animation between spaces
-- highlighted current player row on leaderboard
-- simple sound effects
-- fake masking tape corner graphics
-- paper/cardboard drop shadows
-- tiny doodle icons for shots and sips
-- random flavor text on menu screen
+- stable player/session identifier
+- display name
+- token name and image
+- connection status
+- board position
+- skip-turn count
+- shots
+- sips
+- finished status
 
-These are optional. Do not let polish overcomplicate the core game.
+Drink totals are informational only and must not affect turn order, placement, labels, or the winner.
 
----
+## Player Status Panel
 
-## Non-Goals / Things to Avoid
+The shared-screen player-status panel and neutral end recap must:
 
-Do **not** build this as:
-- an online multiplayer game
-- a mobile controller game
-- a heavy strategy game
-- a complex minigame collection
-- a cluttered UI with too many actions
+- preserve stable turn/join order regardless of drink totals
+- show token, name, board position, shots, sips, and connection state
+- highlight the current player
+- remain readable for the configured maximum number of players
+- avoid covering the board
 
-Do **not** require much gameplay input beyond:
-- setup names/icons
-- clicking Roll Die
+The sidebar remains fixed while the board moves behind its viewport. It is the persistent overview for players whose tokens are not currently drawn in the world.
 
-Keep it straightforward and fun.
+## Scrolling Camera
 
----
+- Track a horizontal camera offset independently from game state and board-space coordinates.
+- Smoothly ease toward the active player's current position instead of snapping.
+- Follow each step of token movement while keeping the active token near the viewport center.
+- Finish turn-change camera movement before enabling the next player's controller.
+- Clamp at the world's left and right edges so Start and Finish receive intentional framing.
+- Keep the active space, nearby path, and enough forward context visible whenever world boundaries allow.
+- Draw only visible spaces, labels, path segments, and decorations.
+- Keep the sidebar, die, messages, event prompts, and pause overlays in screen coordinates.
+- Recalculate the viewport and camera bounds correctly for fullscreen scaling.
 
-## Deliverable Expectations
+Phone controllers may show the player's own drink totals but do not need to reproduce the full player list.
 
-Generate code for a Pygame project that includes:
-- a main menu
-- a player setup screen with name input and token selection
-- a hard-coded editable board
-- image-based tokens
-- turn-based die rolling
-- automatic space resolution
-- score based on 100 per shot and 20 per sip
-- compact stylized leaderboard
-- cardboard/pizza-box inspired board visuals
-- end screen with winner and rankings
+## Visual Style
 
-The code should be organized and readable enough that I can easily:
-- edit the board layout
-- add/remove token images
-- change player limits
-- rename spaces
-- change tile effects
-- restyle the theme later
+Keep the existing homemade pizza-box direction:
 
----
+- cardboard brown and tan palette
+- thick marker outlines
+- uneven, hand-filled spaces
+- casual doodles, grease marks, tape, cheese drips, cups, and pizza slices
+- playful, slightly crooked labels
+- clean enough to read across a room
+
+Avoid a polished fantasy-board or sleek corporate-dashboard appearance.
+
+## Security and LAN Constraints
+
+- Bind only to appropriate local interfaces by default.
+- Treat all browser input as untrusted and validate lengths, types, room membership, turn ownership, and prompt ownership.
+- Escape player names and free-form rules before rendering them in HTML.
+- Use unpredictable room and player session tokens.
+- Do not expose filesystem paths or arbitrary file-serving routes.
+- Do not require microphone, camera, location, or other privileged browser APIs. The Camera app is used only to scan the QR code.
+- Clearly explain that guest Wi-Fi client isolation may prevent phones from reaching the host.
+- Provide a helpful Windows Firewall/network troubleshooting message when the server cannot be reached.
+- The game ends if the host application closes or the computer sleeps; clients should show a reconnecting state rather than freezing.
+
+## Recommended Project Structure
+
+```text
+project/
+├── main.py
+├── game_data.py
+├── models.py
+├── game_engine.py
+├── network_server.py
+├── protocol.py
+├── game_boards/
+├── web/
+│   ├── index.html
+│   ├── controller.js
+│   └── controller.css
+├── assets/
+│   └── tokens/
+│       ├── default/
+│       └── custom/
+└── tests/
+```
+
+Keep Pygame drawing, game rules, network transport, and browser UI separate. The game engine should be testable without opening a Pygame window or starting a real network server.
+
+## Acceptance Criteria
+
+- A host can create a room and see a working QR code and LAN URL.
+- At least two iPhones on the same Wi-Fi can join through Safari without installing an app.
+- Each phone can set its own name and token.
+- Only the current player can successfully roll.
+- Pygame animates the server-generated result and remains authoritative.
+- The shared display shows a smooth left-to-right camera view rather than the complete board.
+- Only the active token appears in the world view, while the fixed sidebar continues to show all players.
+- Turn controls remain disabled until the camera has centered on the active player.
+- Camera movement follows token steps, clamps correctly at Start and Finish, and never exposes blank space beyond the world.
+- Private event prompts appear only on intended controllers and reveal appropriate results on Pygame after submission.
+- Refreshing a controller reconnects to the same player instead of duplicating it.
+- A disconnected current player pauses the turn and can reconnect or be skipped/removed by the host.
+- Shots, sips, movement, Mate propagation, and player status remain synchronized across all clients.
+- Invalid or malicious client actions cannot alter game state.
+- All configured screens remain readable at the supported player limit.
+- The game requires no cloud service, GitHub Pages deployment, port forwarding, or phone application.
+
+## Non-Goals
+
+Do not build:
+
+- public internet matchmaking
+- cloud-hosted rooms
+- GitHub Pages controller hosting
+- native iOS or Android applications
+- peer-to-peer authoritative phone clients
+- heavy strategy or a large minigame collection
+- gameplay that requires constant phone attention
 
 ## Final Instruction to the Coding Assistant
 
-Build this as a **single-device Pygame party board game** with strong emphasis on:
-- low-friction local play
-- highly editable hard-coded content
-- image-based player tokens
-- compact, flavorful UI
-- pizza-box cardboard board aesthetics
-- minimal gameplay input beyond setup + rolling the die
-
-Favor clarity, structure, and editability over unnecessary complexity.
-
+Build Pizza Box Party as a **Pygame shared host with LAN browser controllers**. The host computer serves the controller, owns all game state, and displays a horizontally scrolling board focused on the active player. Phones join through a dynamic QR code, provide private player input, and expose actions only when authorized by the host. Keep the all-player sidebar fixed while the camera moves through the board world. Favor reliability, clear state ownership, reconnection support, editable content, and low-friction party play over unnecessary complexity.

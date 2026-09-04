@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#a87843">
+  <title>Pizza Box Party Controller</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="controller" aria-live="polite">
+    <header>
+      <p class="eyebrow">Pizza Box Party</p>
+      <h1 id="state-title">Connecting...</h1>
+      <p id="status" class="status">Looking for the host.</p>
+      <p id="identity" class="identity" hidden></p>
+    </header>
+
+    <section id="setup" class="panel" hidden>
+      <label for="player-name">Your name</label>
+      <input id="player-name" maxlength="24" autocomplete="nickname" placeholder="Player name">
+      <fieldset>
+        <legend>Choose a token</legend>
+        <div id="token-options" class="token-grid"></div>
+      </fieldset>
+      <button id="join" type="button">Join Game</button>
+    </section>
+
+    <section id="action" class="panel" hidden>
+      <p id="turn-message">Wait for your turn.</p>
+      <button id="roll" class="roll" type="button" disabled>Roll Die</button>
+      <form id="prompt" hidden>
+        <p id="prompt-text"></p>
+        <div id="prompt-controls"></div>
+        <button id="submit-prompt" type="submit">Submit</button>
+      </form>
+    </section>
+    <section id="roster-panel" class="panel roster-panel" hidden>
+      <h2>Players</h2>
+      <ul id="roster" class="roster"></ul>
+    </section>
+  </main>
+  <script src="app.js?v=7" type="module"></script>
+</body>
+</html>
